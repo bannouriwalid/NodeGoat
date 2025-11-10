@@ -52,13 +52,22 @@ stage('SAST - SonarQube Scan') {
   }
 }
 
-    stage('SCA - Snyk Dependency Scan') {
+  stage('SCA - Snyk Scan') {
+      agent {
+        docker { 
+          image 'node:18-alpine'
+          args '-w /usr/src'
+        }
+      }
+      environment {
+        SNYK_TOKEN = credentials('SNYK_TOKEN')
+      }
       steps {
         sh '''
-          docker run --rm -v "$PWD":/project -w /project \
-            -e SNYK_TOKEN=${SNYK_TOKEN} node:18 bash -c "
-            npm install && npm install -g snyk && snyk auth $SNYK_TOKEN && snyk test --severity-threshold=high
-            "
+          npm ci
+          npm install -g snyk
+          snyk auth $SNYK_TOKEN
+          snyk test --severity-threshold=high
         '''
       }
     }
