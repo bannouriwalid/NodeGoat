@@ -18,9 +18,10 @@ pipeline {
 
     stage('Install & Unit Tests') {
       steps {
-        tool name: 'Node_18', type: 'hudson.plugins.nodejs.tools.NodeJsInstallation'
-        sh 'npm ci'
-        sh 'npm test || echo "Tests failed but continuing"'
+        nodejs('Node_18'){
+          sh 'npm ci'
+          sh 'npm test || echo "Tests failed but continuing"'
+        }
       }
     }
 
