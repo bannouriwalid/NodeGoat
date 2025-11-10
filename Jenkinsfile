@@ -60,7 +60,7 @@ stage('SAST - SonarQube Scan') {
       }
     }
     environment {
-      SNYK_TOKEN = credentials('snyk-token')
+      SNYK_TOKEN = credentials('SNYK_TOKEN')
     }
     steps {
       sh '''
