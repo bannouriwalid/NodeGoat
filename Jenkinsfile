@@ -16,62 +16,55 @@ pipeline {
       }
     }
 
-stage('Install & Unit Tests') {
+    stage('Install & Unit Tests') {
       agent {
-        // Use a Node.js image just for this stage
         docker {
           image 'node:18-alpine' 
-          // Use the absolute path /usr/src as the workspace
-          // This is a common and reliable practice for Docker agents
           args '-w /usr/src'
         }
       }
       steps {
-        // The workspace is mounted automatically to /usr/src inside the container
         sh 'npm ci'
         sh 'npm test || echo "Tests failed but continuing"'
       }
     }
 
-stage('SAST - SonarQube Scan') {
-  agent {
-    docker {
-      image 'sonarsource/sonar-scanner-cli:latest' 
-    }
-  }
-  steps {
-    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
-      sh '''
-        sonar-scanner \
-          -Dsonar.projectKey=nodegoat \
-          -Dsonar.sources=. \
-          -Dsonar.host.url=http://host.docker.internal:9000 \
-          -Dsonar.login=$SONAR_LOGIN
-      '''
-    }
-  }
-}
-
-  stage('SCA - Snyk Scan') {
-    agent {
-      docker {
-        image 'node:18-alpine'
-        args '-w /usr/src'
+    stage('SAST - SonarQube Scan') {
+      agent {
+        docker { image 'sonarsource/sonar-scanner-cli:latest' }
+      }
+      steps {
+        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
+          sh '''
+            sonar-scanner \
+              -Dsonar.projectKey=nodegoat \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=http://host.docker.internal:9000 \
+              -Dsonar.login=$SONAR_LOGIN
+          '''
+        }
       }
     }
-    environment {
-      SNYK_TOKEN = credentials('SNYK_TOKEN')
+
+    stage('SCA - Snyk Scan') {
+      agent {
+        docker {
+          image 'node:18-alpine'
+          args '-w /usr/src'
+        }
+      }
+      environment {
+        SNYK_TOKEN = credentials('SNYK_TOKEN')
+      }
+      steps {
+        sh '''
+          npm ci
+          npm install snyk --save-dev
+          npx snyk auth $SNYK_TOKEN
+          npx snyk test --severity-threshold=high || true
+        '''
+      }
     }
-    steps {
-      sh '''
-        npm ci
-        npm install snyk --save-dev
-        npx snyk auth $SNYK_TOKEN
-        # Run Snyk but do not fail the pipeline even if high-severity issues exist
-        npx snyk test --severity-threshold=high || true
-      '''
-    }
-  }
 
     stage('Build Docker Image & Deploy Ephemeral App') {
       steps {
@@ -84,20 +77,19 @@ stage('SAST - SonarQube Scan') {
       }
     }
 
-  stage('DAST - OWASP ZAP Scan') {
-    steps {
-      sh '''
-        # Run ZAP baseline scan
-        docker run --rm --network nodegoat-net \
-          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-          -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json
+    stage('DAST - OWASP ZAP Scan') {
+      steps {
+        sh '''
+          docker run --rm --network nodegoat-net \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json
 
-        # Fail pipeline if any high-risk alerts (risk=3)
-        if grep -q '"risk": 3' zap_report.json; then
-          echo "High-risk issues found by ZAP"
-          exit 1
-        fi
-      '''
+          if grep -q '"risk": 3' zap_report.json; then
+            echo "High-risk issues found by ZAP"
+            exit 1
+          fi
+        '''
+      }
     }
   }
 
@@ -109,5 +101,4 @@ stage('SAST - SonarQube Scan') {
       '''
     }
   }
-}
 }
