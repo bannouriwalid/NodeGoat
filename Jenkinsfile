@@ -57,7 +57,7 @@ stage('SAST - SonarQube Scan') {
         sh '''
           docker run --rm -v "$PWD":/project -w /project \
             -e SNYK_TOKEN=${SNYK_TOKEN} node:18 bash -c "
-              npm ci && npm install -g snyk && snyk auth ${SNYK_TOKEN} && snyk test --severity-threshold=high
+            npm install && npm install -g snyk && snyk auth $SNYK_TOKEN && snyk test --severity-threshold=high
             "
         '''
       }
