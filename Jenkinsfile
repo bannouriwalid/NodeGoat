@@ -16,12 +16,20 @@ pipeline {
       }
     }
 
-    stage('Install & Unit Tests') {
-      steps {
-        nodejs('Node_18'){
-          sh 'npm ci'
-          sh 'npm test || echo "Tests failed but continuing"'
+stage('Install & Unit Tests') {
+      agent {
+        // Use a Node.js image just for this stage
+        docker {
+          image 'node:18-alpine' 
+          // Use the absolute path /usr/src as the workspace
+          // This is a common and reliable practice for Docker agents
+          args '-w /usr/src'
         }
+      }
+      steps {
+        // The workspace is mounted automatically to /usr/src inside the container
+        sh 'npm ci'
+        sh 'npm test || echo "Tests failed but continuing"'
       }
     }
 
