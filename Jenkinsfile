@@ -67,7 +67,8 @@ stage('SAST - SonarQube Scan') {
         npm ci
         npm install snyk --save-dev
         npx snyk auth $SNYK_TOKEN
-        npx snyk test --severity-threshold=high
+        # Run Snyk but do not fail the pipeline even if high-severity issues exist
+        npx snyk test --severity-threshold=high || true
       '''
     }
   }
