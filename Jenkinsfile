@@ -110,3 +110,4 @@ stage('SAST - SonarQube Scan') {
     }
   }
 }
+}
