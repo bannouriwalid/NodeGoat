@@ -33,25 +33,24 @@ stage('Install & Unit Tests') {
       }
     }
 
-  stage('SAST - SonarQube Scan') {
-    agent {
-      docker { image 'sonarsource/sonar-scanner-cli:latest' args '-v $WORKSPACE:/usr/src' }
-    }
-    environment {
-      SONAR_HOST_URL = 'http://host.docker.internal:9000'
-    }
-    steps {
-      withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
-        sh '''
-          sonar-scanner \
-            -Dsonar.projectKey=nodegoat \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=$SONAR_HOST_URL \
-            -Dsonar.login=$SONAR_LOGIN
-        '''
-      }
+stage('SAST - SonarQube Scan') {
+  agent {
+    docker {
+      image 'sonarsource/sonar-scanner-cli:latest' 
     }
   }
+  steps {
+    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_LOGIN')]) {
+      sh '''
+        sonar-scanner \
+          -Dsonar.projectKey=nodegoat \
+          -Dsonar.sources=. \
+          -Dsonar.host.url=http://host.docker.internal:9000 \
+          -Dsonar.login=$SONAR_LOGIN
+      '''
+    }
+  }
+}
 
     stage('SCA - Snyk Dependency Scan') {
       steps {
