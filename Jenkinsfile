@@ -84,22 +84,22 @@ stage('SAST - SonarQube Scan') {
       }
     }
 
-    stage('DAST - OWASP ZAP Scan') {
-      steps {
-        sh '''
-          docker run --rm --network nodegoat-net \
-            owasp/zap2docker-weekly zap-baseline.py \
-            -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json
-          
-          # Check for high-risk alerts
-          if grep -q '"risk": "High"' zap_report.json; then
-            echo "High-risk issues found by ZAP"
-            exit 1
-          fi
-        '''
-      }
-    }
+stage('DAST - OWASP ZAP Scan') {
+  steps {
+    sh '''
+      # Run ZAP baseline scan
+      docker run --rm --network nodegoat-net \
+        ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+        -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json
+
+      # Fail pipeline if any high-risk alerts (risk=3)
+      if grep -q '"risk": 3' zap_report.json; then
+        echo "High-risk issues found by ZAP"
+        exit 1
+      fi
+    '''
   }
+}
 
   post {
     always {
