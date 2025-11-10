@@ -88,7 +88,7 @@ stage('SAST - SonarQube Scan') {
       steps {
         sh '''
           docker run --rm --network nodegoat-net \
-            owasp/zap2docker-stable zap-baseline.py \
+            owasp/zap2docker-weekly zap-baseline.py \
             -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json
           
           # Check for high-risk alerts
