@@ -34,24 +34,24 @@ pipeline {
       }
     }
 
-    stage('SAST - SonarQube') {
+    stage('SAST - SonarQube Scan') {
       agent {
         docker {
-          image 'node:18-alpine'
-          args '-u root'
+          image 'sonarsource/sonar-scanner-cli:latest' 
+          args '-v $WORKSPACE:/usr/src'
+          reuseNode true
         }
       }
       steps {
-        sh '''
-          echo "Installing SonarQube scanner..."
-          npm install -g sonar-scanner
-          echo "Running SonarQube scan..."
-          sonar-scanner \
-            -Dsonar.projectKey=nodegoat \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=http://host.docker.internal:9000 \
-            -Dsonar.login=${SONAR_TOKEN} || true
-        '''
+        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_LOGIN')]) {
+          sh '''
+            sonar-scanner \
+              -Dsonar.projectKey=nodegoat \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=http://host.docker.internal:9000 \
+              -Dsonar.login=$SONAR_LOGIN
+          '''
+        }
       }
     }
 
