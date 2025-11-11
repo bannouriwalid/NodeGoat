@@ -106,7 +106,6 @@ pipeline {
 
   post {
     always {
-      agent any
       steps {
         sh '''
           echo "Cleaning up containers and networks..."
