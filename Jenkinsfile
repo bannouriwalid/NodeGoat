@@ -79,8 +79,13 @@ pipeline {
           echo "Building Docker image..."
           docker build -t ${DOCKER_IMAGE} .
 
-          echo "Starting ephemeral container..."
+          echo "Removing old container if exists..."
+          docker rm -f nodegoat-app || true
+
+          echo "Creating network if it doesn't exist..."
           docker network create nodegoat-net || true
+
+          echo "Starting ephemeral container..."
           docker run -d --name nodegoat-app --network nodegoat-net -p ${APP_PORT}:4000 ${DOCKER_IMAGE}
         '''
       }
