@@ -95,33 +95,33 @@ pipeline {
       agent any
       steps {
         sh '''
-          echo "Running ZAP baseline scan..."
-          mkdir -p zap-reports
-          chmod 777 zap-reports
+            echo "Running ZAP baseline scan..."
+            mkdir -p zap-reports
+            chmod 777 zap-reports
 
-          echo "Waiting for NodeGoat app to be ready..."
-          for i in {1..10}; do
-            if curl -s http://nodegoat-app:4000 >/dev/null; then
-              echo "App is up!"
-              break
+            echo "Waiting for NodeGoat app to be ready..."
+            for i in {1..10}; do
+              if curl -s http://localhost:4000 >/dev/null; then
+                echo "App is up!"
+                break
+              fi
+              echo "Waiting..."
+              sleep 2
+            done
+
+            docker run --rm -u 0 --network nodegoat-net \
+              -v $(pwd)/zap-reports:/zap/wrk \
+              ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+              -t http://nodegoat-app:4000 \
+              -r /zap/wrk/zap_report.html \
+              -J /zap/wrk/zap_report.json
+
+            if [ -f zap-reports/zap_report.json ] && grep -q '"risk": 3' zap-reports/zap_report.json; then
+              echo "High-risk issues found by ZAP"
+              exit 1
+            else
+              echo "ZAP scan completed successfully"
             fi
-            echo "Waiting..."
-            sleep 2
-          done
-
-          docker run --rm --network nodegoat-net \
-            -v $(pwd)/zap-reports:/zap/wrk \
-            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-            -t http://nodegoat-app:4000 \
-            -r /zap/wrk/zap_report.html \
-            -J /zap/wrk/zap_report.json
-
-          if [ -f zap-reports/zap_report.json ] && grep -q '"risk": 3' zap-reports/zap_report.json; then
-            echo "High-risk issues found by ZAP"
-            exit 1
-          else
-            echo "ZAP scan completed successfully"
-          fi
         '''
       }
     }
