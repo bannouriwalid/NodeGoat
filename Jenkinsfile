@@ -1,10 +1,5 @@
 pipeline {
-  agent {
-    docker {
-      image 'node:18-alpine'
-      args '-u root -v /var/run/docker.sock:/var/run/docker.sock -w /usr/src'
-    }
-  }
+  agent none
 
   environment {
     SONAR_TOKEN = credentials('SONAR_TOKEN')
@@ -16,12 +11,19 @@ pipeline {
   stages {
 
     stage('Checkout') {
+      agent any
       steps {
         checkout scm
       }
     }
 
     stage('Install Dependencies & Unit Tests') {
+      agent {
+        docker {
+          image 'node:18-alpine'
+          args '-u root'
+        }
+      }
       steps {
         sh '''
           echo "Installing dependencies..."
@@ -32,22 +34,34 @@ pipeline {
       }
     }
 
-  stage('SAST - SonarQube') {
-    steps {
-      sh '''
-        echo "Installing SonarQube scanner..."
-        npm install -g sonar-scanner
-        echo "Running SonarQube scan..."
-        sonar-scanner \
-          -Dsonar.projectKey=nodegoat \
-          -Dsonar.sources=. \
-          -Dsonar.host.url=http://host.docker.internal:9000 \
-          -Dsonar.login=${SONAR_TOKEN} || true
-      '''
+    stage('SAST - SonarQube') {
+      agent {
+        docker {
+          image 'node:18-alpine'
+          args '-u root'
+        }
+      }
+      steps {
+        sh '''
+          echo "Installing SonarQube scanner..."
+          npm install -g sonar-scanner
+          echo "Running SonarQube scan..."
+          sonar-scanner \
+            -Dsonar.projectKey=nodegoat \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=http://host.docker.internal:9000 \
+            -Dsonar.login=${SONAR_TOKEN} || true
+        '''
+      }
     }
-  }
 
     stage('SCA - Snyk') {
+      agent {
+        docker {
+          image 'node:18-alpine'
+          args '-u root'
+        }
+      }
       steps {
         sh '''
           echo "Running Snyk scan..."
@@ -59,6 +73,7 @@ pipeline {
     }
 
     stage('Build & Run App (Ephemeral)') {
+      agent any // uses Jenkins agent directly with Docker installed
       steps {
         sh '''
           echo "Building Docker image..."
@@ -72,6 +87,7 @@ pipeline {
     }
 
     stage('DAST - OWASP ZAP Scan') {
+      agent any // uses Jenkins agent directly with Docker installed
       steps {
         sh '''
           echo "Running ZAP baseline scan..."
@@ -90,14 +106,17 @@ pipeline {
 
   post {
     always {
-      sh '''
-        echo "Cleaning up containers and networks..."
-        docker rm -f nodegoat-app || true
-        docker network rm nodegoat-net || true
+      agent any
+      steps {
+        sh '''
+          echo "Cleaning up containers and networks..."
+          docker rm -f nodegoat-app || true
+          docker network rm nodegoat-net || true
 
-        echo "Removing built image to avoid accumulation..."
-        docker rmi -f ${DOCKER_IMAGE} || true
-      '''
+          echo "Removing built image to avoid accumulation..."
+          docker rmi -f ${DOCKER_IMAGE} || true
+        '''
+      }
     }
   }
 }
