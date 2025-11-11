@@ -43,7 +43,7 @@ pipeline {
         }
       }
       steps {
-        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_LOGIN')]) {
+        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
           sh '''
             sonar-scanner \
               -Dsonar.projectKey=nodegoat \
