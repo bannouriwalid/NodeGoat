@@ -77,20 +77,27 @@ pipeline {
       }
     }
 
-    stage('DAST - OWASP ZAP Scan') {
-      steps {
-        sh '''
-          docker run --rm --network nodegoat-net \
-            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-            -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json
+  stage('DAST - OWASP ZAP Scan') {
+    steps {
+      sh '''
+        docker run --rm \
+          --network nodegoat-net \
+          -v $WORKSPACE:/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+          -t http://nodegoat-app:4000 \
+          -r zap_report.html \
+          -J zap_report.json
 
-          if grep -q '"risk": 3' zap_report.json; then
-            echo "High-risk issues found by ZAP"
-            exit 1
-          fi
-        '''
-      }
+        # Fail if any high risk alerts are found
+        if grep -q '"risk": 3' zap_report.json; then
+          echo "High-risk issues found by ZAP"
+          exit 1
+        else
+          echo "No high-risk issues detected by ZAP"
+        fi
+      '''
     }
+  }
   }
 
   post {
