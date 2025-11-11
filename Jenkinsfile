@@ -32,24 +32,20 @@ pipeline {
       }
     }
 
-    stage('SAST - SonarQube') {
-      agent {
-        docker {
-          image 'sonarsource/sonar-scanner-cli:latest'
-          args '-u root -v /var/run/docker.sock:/var/run/docker.sock -w /usr/src'
-        }
-      }
-      steps {
-        sh '''
-          echo "Running SonarQube scan..."
-          sonar-scanner \
-            -Dsonar.projectKey=nodegoat \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=http://host.docker.internal:9000 \
-            -Dsonar.login=${SONAR_TOKEN} || true
-        '''
-      }
+  stage('SAST - SonarQube') {
+    steps {
+      sh '''
+        echo "Installing SonarQube scanner..."
+        npm install -g sonar-scanner
+        echo "Running SonarQube scan..."
+        sonar-scanner \
+          -Dsonar.projectKey=nodegoat \
+          -Dsonar.sources=. \
+          -Dsonar.host.url=http://host.docker.internal:9000 \
+          -Dsonar.login=${SONAR_TOKEN} || true
+      '''
     }
+  }
 
     stage('SCA - Snyk') {
       steps {
