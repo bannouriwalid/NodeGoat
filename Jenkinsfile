@@ -109,7 +109,7 @@ pipeline {
               sleep 2
             done
 
-            docker run --rm -u 0 --network nodegoat-net \
+            docker run --rm -u 0\
               -v $(pwd)/zap-reports:/zap/wrk \
               ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
               -t http://host.docker.internal:4000 \
