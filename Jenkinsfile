@@ -32,17 +32,29 @@ pipeline {
       }
     }
 
-    stage('SAST & SCA (SonarQube + Snyk)') {
+    stage('SAST - SonarQube') {
+      agent {
+        docker {
+          image 'sonarsource/sonar-scanner-cli:latest'
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock -w /usr/src'
+        }
+      }
       steps {
         sh '''
-          # SonarQube Scan
-          npx sonar-scanner \
+          echo "Running SonarQube scan..."
+          sonar-scanner \
             -Dsonar.projectKey=nodegoat \
             -Dsonar.sources=. \
             -Dsonar.host.url=http://host.docker.internal:9000 \
             -Dsonar.login=${SONAR_TOKEN} || true
+        '''
+      }
+    }
 
-          # Snyk Scan
+    stage('SCA - Snyk') {
+      steps {
+        sh '''
+          echo "Running Snyk scan..."
           npm install snyk --save-dev
           npx snyk auth ${SNYK_TOKEN}
           npx snyk test --severity-threshold=high || true
