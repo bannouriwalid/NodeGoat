@@ -112,7 +112,7 @@ pipeline {
             docker run --rm -u 0 --network nodegoat-net \
               -v $(pwd)/zap-reports:/zap/wrk \
               ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-              -t http://nodegoat-app:4000 \
+              -t http://host.docker.internal:4000 \
               -r /zap/wrk/zap_report.html \
               -J /zap/wrk/zap_report.json
 
