@@ -87,15 +87,20 @@ pipeline {
     }
 
     stage('DAST - OWASP ZAP Scan') {
-      agent any // uses Jenkins agent directly with Docker installed
+      agent any
       steps {
         sh '''
           echo "Running ZAP baseline scan..."
-          docker run --rm --network nodegoat-net \
-            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-            -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json || true
+          mkdir -p zap-reports
 
-          if grep -q '"risk": 3' zap_report.json; then
+          docker run --rm --network nodegoat-net \
+            -v $(pwd)/zap-reports:/zap/wrk \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://nodegoat-app:4000 \
+            -r /zap/wrk/zap_report.html \
+            -J /zap/wrk/zap_report.json || true
+
+          if grep -q '"risk": 3' zap-reports/zap_report.json; then
             echo "High-risk issues found by ZAP"
             exit 1
           fi
