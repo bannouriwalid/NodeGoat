@@ -1,9 +1,14 @@
 pipeline {
-  agent any
+  agent {
+    docker {
+      image 'node:18-alpine'
+      args '-u root -v /var/run/docker.sock:/var/run/docker.sock -w /usr/src'
+    }
+  }
 
   environment {
     SONAR_TOKEN = credentials('SONAR_TOKEN')
-    SNYK_TOKEN = credentials('SNYK_TOKEN')
+    SNYK_TOKEN  = credentials('SNYK_TOKEN')
     DOCKER_IMAGE = "nodegoat:${env.BUILD_NUMBER}"
     APP_PORT = "4000"
   }
@@ -16,95 +21,74 @@ pipeline {
       }
     }
 
-    stage('Install & Unit Tests') {
-      agent {
-        docker {
-          image 'node:18-alpine' 
-          args '-w /usr/src'
-        }
-      }
-      steps {
-        sh 'npm ci'
-        sh 'npm test || echo "Tests failed but continuing"'
-      }
-    }
-
-    stage('SAST - SonarQube Scan') {
-      agent {
-        docker { image 'sonarsource/sonar-scanner-cli:latest' }
-      }
-      steps {
-        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN')]) {
-          sh '''
-            sonar-scanner \
-              -Dsonar.projectKey=nodegoat \
-              -Dsonar.sources=. \
-              -Dsonar.host.url=http://host.docker.internal:9000 \
-              -Dsonar.login=$SONAR_LOGIN
-          '''
-        }
-      }
-    }
-
-    stage('SCA - Snyk Scan') {
-      agent {
-        docker {
-          image 'node:18-alpine'
-          args '-w /usr/src'
-        }
-      }
-      environment {
-        SNYK_TOKEN = credentials('SNYK_TOKEN')
-      }
+    stage('Install Dependencies & Unit Tests') {
       steps {
         sh '''
+          echo "Installing dependencies..."
           npm ci
+          echo "Running unit tests..."
+          npm test || echo "Tests failed but continuing"
+        '''
+      }
+    }
+
+    stage('SAST & SCA (SonarQube + Snyk)') {
+      steps {
+        sh '''
+          # SonarQube Scan
+          npx sonar-scanner \
+            -Dsonar.projectKey=nodegoat \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=http://host.docker.internal:9000 \
+            -Dsonar.login=${SONAR_TOKEN} || true
+
+          # Snyk Scan
           npm install snyk --save-dev
-          npx snyk auth $SNYK_TOKEN
+          npx snyk auth ${SNYK_TOKEN}
           npx snyk test --severity-threshold=high || true
         '''
       }
     }
 
-    stage('Build Docker Image & Deploy Ephemeral App') {
+    stage('Build & Run App (Ephemeral)') {
       steps {
         sh '''
+          echo "Building Docker image..."
           docker build -t ${DOCKER_IMAGE} .
+
+          echo "Starting ephemeral container..."
           docker network create nodegoat-net || true
-          docker rm -f nodegoat-app || true
           docker run -d --name nodegoat-app --network nodegoat-net -p ${APP_PORT}:4000 ${DOCKER_IMAGE}
         '''
       }
     }
 
-  stage('DAST - OWASP ZAP Scan') {
-    steps {
-      sh '''
-        docker run --rm \
-          --network nodegoat-net \
-          -v $WORKSPACE:/zap/wrk \
-          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-          -t http://nodegoat-app:4000 \
-          -r zap_report.html \
-          -J zap_report.json
+    stage('DAST - OWASP ZAP Scan') {
+      steps {
+        sh '''
+          echo "Running ZAP baseline scan..."
+          docker run --rm --network nodegoat-net \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://nodegoat-app:4000 -r zap_report.html -J zap_report.json || true
 
-        # Fail if any high risk alerts are found
-        if grep -q '"risk": 3' zap_report.json; then
-          echo "High-risk issues found by ZAP"
-          exit 1
-        else
-          echo "No high-risk issues detected by ZAP"
-        fi
-      '''
+          if grep -q '"risk": 3' zap_report.json; then
+            echo "High-risk issues found by ZAP"
+            exit 1
+          fi
+        '''
+      }
     }
-  }
   }
 
   post {
     always {
       sh '''
+        echo "Cleaning up containers and networks..."
         docker rm -f nodegoat-app || true
         docker network rm nodegoat-net || true
+
+        echo "Removing built image to avoid accumulation..."
+        docker rmi -f ${DOCKER_IMAGE} || true
       '''
     }
   }
