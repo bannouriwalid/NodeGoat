@@ -85,6 +85,7 @@ pipeline {
     }
 
     stage('Start MongoDB') {
+      agent any
       steps {
         sh '''
           echo "Removing old Mongo container if exists..."
@@ -103,6 +104,7 @@ pipeline {
     }
 
     stage('Run NodeGoat App') {
+      agent any
       steps {
         sh '''
           echo "Removing old NodeGoat container if exists..."
@@ -132,6 +134,7 @@ pipeline {
     }
 
     stage('DAST - OWASP ZAP Scan') {
+      agent any
       steps {
         sh '''
           echo "Running ZAP baseline scan..."
