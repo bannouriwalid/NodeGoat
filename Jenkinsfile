@@ -28,7 +28,7 @@ pipeline {
       }
       steps {
         sh '''
-          npm ci
+          npm install --legacy-peer-deps
           npm test || echo "Unit tests failed, continuing..."
         '''
       }
