@@ -15,6 +15,7 @@ const marked = require("marked");
 const app = express(); // Web framework to handle routing requests
 const routes = require("./app/routes");
 const { port, db, cookieSecret } = require("./config/config"); // Application config properties
+
 /*
 // Fix for A6-Sensitive Data Exposure
 // Load keys for establishing secure HTTPS connection
@@ -73,6 +74,7 @@ MongoClient.connect(db, (err, db) => {
         // Mandatory in Express v4
         extended: false
     }));
+    
 
     // Enable session management using express middleware
     app.use(session({
@@ -130,7 +132,16 @@ MongoClient.connect(db, (err, db) => {
 
     // Application routes
     routes(app, db);
-
+    // register DAST simulation routes only when explicitly enabled
+    if (process.env.SIMULATE_CRITICAL === 'true') {
+    try {
+        const simulateRouter = require('./app/routes/simulate');
+        app.use('/__simulate', simulateRouter);
+        console.log('DAST simulation routes enabled at /__simulate');
+    } catch (e) {
+        console.warn('DAST simulation router not available:', e.message);
+    }
+    }
     // Template system setup
     swig.setDefaults({
         // Autoescape disabled
