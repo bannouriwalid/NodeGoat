@@ -21,14 +21,17 @@ pipeline {
   }
 
   post {
-    always {
-      agent any
-      sh '''
-        docker rm -f nodegoat-app || true
-        docker rm -f nodegoat-mongo || true
-        docker network rm ${NETWORK_NAME} || true
-        docker rmi -f ${DOCKER_IMAGE} || true
-      '''
-    }
+      always {
+          script {
+              node {
+                  sh '''
+                      docker rm -f nodegoat-app || true
+                      docker rm -f nodegoat-mongo || true
+                      docker network rm ${NETWORK_NAME} || true
+                      docker rmi -f ${DOCKER_IMAGE} || true
+                  '''
+              }
+          }
+      }
   }
 }
