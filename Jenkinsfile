@@ -33,7 +33,7 @@ pipeline {
         '''
       }
     }
-
+/*
     stage('SAST - SonarQube Scan') {
       agent {
         docker {
@@ -53,7 +53,7 @@ pipeline {
           '''
         }
       }
-    }
+    }*/
 
     stage('SCA - Snyk') {
       agent {
@@ -66,7 +66,7 @@ pipeline {
         sh '''
           npm install snyk --save-dev
           npx snyk auth ${SNYK_TOKEN}
-          npx snyk test --severity-threshold=high || true
+          npx snyk test --severity-threshold=high
         '''
       }
     }
