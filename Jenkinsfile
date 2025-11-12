@@ -22,6 +22,7 @@ pipeline {
 
   post {
     always {
+      agent any
       sh '''
         docker rm -f nodegoat-app || true
         docker rm -f nodegoat-mongo || true
