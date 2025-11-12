@@ -119,24 +119,27 @@ pipeline {
 
           docker run --rm -u 0 \
             --network ${NETWORK_NAME} \
-            -v "$WORKDIR/zap-reports:/zap/wrk" \
             ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
             -t http://nodegoat-app:4000 \
             -r /zap/wrk/zap_report.html \
-            -J /zap/wrk/zap_report.json || true
+            -J /zap/wrk/zap_report.json
         '''
       }
     }
   }
 
   post {
-    always {
-      sh '''
-        docker rm -f nodegoat-app || true
-        docker rm -f nodegoat-mongo || true
-        docker network rm ${NETWORK_NAME} || true
-        docker rmi -f ${DOCKER_IMAGE} || true
-      '''
-    }
+      always {
+          script {
+              node {
+                  sh '''
+                      docker rm -f nodegoat-app || true
+                      docker rm -f nodegoat-mongo || true
+                      docker network rm ${NETWORK_NAME} || true
+                      docker rmi -f ${DOCKER_IMAGE} || true
+                  '''
+              }
+          }
+      }
   }
 }
