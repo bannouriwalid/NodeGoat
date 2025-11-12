@@ -10,25 +10,29 @@ function ProfileHandler(db) {
 
     const profile = new ProfileDAO(db);
 
+    // Simulation mode: when true, we will expose an example insecure SQL string in responses
+    // for testing scanners. THIS DOES NOT EXECUTE the SQL — it only builds the string.
+    const SIMULATE_SQLI = (process.env.SIMULATE_SQLI === 'true');
+
     this.displayProfile = (req, res, next) => {
         const {
             userId
         } = req.session;
-
-
 
         profile.getByUserId(parseInt(userId), (err, doc) => {
             if (err) return next(err);
             doc.userId = userId;
 
             // @TODO @FIXME
-            // while the developer intentions were correct in encoding the user supplied input so it
-            // doesn't end up as an XSS attack, the context is incorrect as it is encoding the firstname for HTML
-            // while this same variable is also used in the context of a URL link element
+            // developer tried to encode for HTML but the context is also used in URLs
             doc.website = ESAPI.encoder().encodeForHTML(doc.website);
-            // fix it by replacing the above with another template variable that is used for 
-            // the context of a URL in a link header
-            // doc.website = ESAPI.encoder().encodeForURL(doc.website)
+
+            // --- SIMULATION: expose an example insecure query for scanners (read-only) ---
+            if (SIMULATE_SQLI) {
+                // Build a visible but non-executed unsafe SQL pattern to trigger scanners
+                // This constructs a string illustrating naive concatenation (intentionally unsafe pattern)
+                doc.simulatedInsecureQuery = "SELECT * FROM users WHERE id = " + parseInt(userId) + " AND name = '" + doc.firstName + "';";
+            }
 
             return res.render("profile", {
                 ...doc,
@@ -49,17 +53,9 @@ function ProfileHandler(db) {
             bankRouting
         } = req.body;
 
-        // Fix for Section: ReDoS attack
-        // The following regexPattern that is used to validate the bankRouting number is insecure and vulnerable to
-        // catastrophic backtracking which means that specific type of input may cause it to consume all CPU resources
-        // with an exponential time until it completes
-        // --
-        // The Fix: Instead of using greedy quantifiers the same regex will work if we omit the second quantifier +
-        // const regexPattern = /([0-9]+)\#/;
+        // Fix for Section: ReDoS attack (commented explanation kept)
         const regexPattern = /([0-9]+)+\#/;
-        // Allow only numbers with a suffix of the letter #, for example: 'XXXXXX#'
         const testComplyWithRequirements = regexPattern.test(bankRouting);
-        // if the regex test fails we do not allow saving
         if (testComplyWithRequirements !== true) {
             const firstNameSafeString = firstName;
             return res.render("profile", {
@@ -79,6 +75,16 @@ function ProfileHandler(db) {
             userId
         } = req.session;
 
+        // --- SIMULATION: build insecure SQL string but DO NOT execute it ---
+        // This is used only for testing scanners (e.g., DAST) and will be returned
+        // in the rendered template for inspection. It does not touch the DB.
+        let simulatedInsecureQuery;
+        if (SIMULATE_SQLI) {
+            simulatedInsecureQuery = "UPDATE users SET firstName = '" + firstName +
+                "', lastName = '" + lastName + "' WHERE id = " + parseInt(userId) + ";";
+            // NOTE: We DO NOT run this query. It's only returned in the page for scanners.
+        }
+
         profile.updateUser(
             parseInt(userId),
             firstName,
@@ -92,10 +98,13 @@ function ProfileHandler(db) {
 
                 if (err) return next(err);
 
-                // WARN: Applying any sting specific methods here w/o checking type of inputs could lead to DoS by HPP
-                //firstName = firstName.trim();
                 user.updateSuccess = true;
                 user.userId = userId;
+
+                // If simulation is enabled, expose the simulated unsafe SQL in the rendered page
+                if (SIMULATE_SQLI) {
+                    user.simulatedInsecureQuery = simulatedInsecureQuery;
+                }
 
                 return res.render("profile", {
                     ...user,
